@@ -20,6 +20,13 @@
   with_items: "{{ undercloud_cidr }}"
   when: undercloud_cidr is defined
 
+- name: Permit ceph cluster network
+  ufw: rule=allow from_ip={{ item.cidr }} proto=any
+  with_items: "{{ undercloud_osd_cidr }}"
+  when:
+    - undercloud_osd_cidr is defined
+    - "'ceph_osds' in group_names"
+
 - name: Do not enforce forwarding rules with UFW
   lineinfile: dest=/etc/default/ufw regexp="^DEFAULT_FORWARD_POLICY"
               line="DEFAULT_FORWARD_POLICY=\"ACCEPT\""

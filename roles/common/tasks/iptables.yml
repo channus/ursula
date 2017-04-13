@@ -138,3 +138,32 @@
       - "{{ undercloud_cidr }}"
       - "{{ iptables_changed.results }}"
   when: undercloud_cidr is defined
+
+- block:
+  - name: Persist permit unrestricted ceph cluster network
+    lineinfile:
+      dest: /etc/sysconfig/iptables
+      state: present
+      regexp: "^-A INPUT.*-p all -s {{ item.cidr }}.*-j ACCEPT"
+      insertbefore: "^-A INPUT -j REJECT --reject-with icmp-host-prohibited$"
+      line: "-A INPUT -m state --state NEW -p all -s {{ item.cidr }} -j ACCEPT"
+      backup: yes
+    with_items: "{{ undercloud_osd_cidr }}"
+    register: iptables_changed
+
+  - name: Permit unrestricted ceph cluster network
+    iptables:
+      action: insert
+      table: filter
+      chain: INPUT
+      ctstate: NEW
+      protocol: all
+      source: "{{ item.0.cidr }}"
+      jump: ACCEPT
+    when: item.1.changed
+    with_together:
+      - "{{ undercloud_osd_cidr }}"
+      - "{{ iptables_changed.results }}"
+  when:
+    - undercloud_osd_cidr is defined
+    - "'ceph_osds' in group_names"
